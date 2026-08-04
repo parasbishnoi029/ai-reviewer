@@ -1,14 +1,26 @@
 from fastapi import FastAPI, Request
+from pydantic import BaseModel
 import httpx
 import os
-import json
 from datetime import datetime
 from dotenv import load_dotenv
 from graph import ai_reviewer_graph
+from supabase import create_client, Client
 
 load_dotenv()
 app = FastAPI()
+
+# Load all 4 keys from the environment
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+SUPABASE_URL = os.getenv(https://ylevykwrsbkjoexwznaw.supabase.co)
+SUPABASE_KEY = os.getenv(sb_publishable_i0iKJaN7QDdwRp0yGg82vQ_uMAMLVT0)
+
+# Initialize the cloud database connection
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Define the data structure for our new Chatbot feature
+class ManualReviewRequest(BaseModel):
+    code: str
 
 @app.get("/")
 async def home():
@@ -32,34 +44,28 @@ async def github_webhook(request: Request):
                 result = ai_reviewer_graph.invoke({"code_diff": code_diff})
                 ai_feedback = result["feedback"]
                 
+                # Post the comment to GitHub
                 headers = {
                     "Authorization": f"Bearer {GITHUB_TOKEN}",
                     "Accept": "application/vnd.github.v3+json"
                 }
                 comment_payload = {"body": f"🤖 **AI Code Review:**\n\n{ai_feedback}"}
-                
-                # Post to GitHub
                 await client.post(comments_url, headers=headers, json=comment_payload)
-                print("✅ Successfully posted AI review to GitHub!")
                 
-                # --- NEW: SAVE TO DATABASE FOR DASHBOARD ---
-                review_record = {
+                # --- NEW: SAVE TO SUPABASE INSTEAD OF LOCAL FILE ---
+                record = {
                     "pr_url": pr_html_url,
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "feedback": ai_feedback
                 }
-                
-                # Load existing reviews or start fresh
-                reviews = []
-                if os.path.exists("reviews.json"):
-                    with open("reviews.json", "r") as f:
-                        reviews = json.load(f)
-                        
-                reviews.append(review_record)
-                
-                # Save back to file
-                with open("reviews.json", "w") as f:
-                    json.dump(reviews, f, indent=4)
-                print("✅ Saved review to local database!")
+                supabase.table("reviews").insert(record).execute()
+                print("✅ Saved review to Supabase!")
                 
     return {"status": "success"}
+
+# --- NEW: CHATBOT ENDPOINT ---
+@app.post("/manual-review")
+async def manual_review(req: ManualReviewRequest):
+    # This directly processes code pasted into the Streamlit dashboard!
+    result = ai_reviewer_graph.invoke({"code_diff": req.code})
+    return {"feedback": result["feedback"]}
