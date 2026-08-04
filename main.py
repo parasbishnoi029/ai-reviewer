@@ -1,8 +1,14 @@
 from fastapi import FastAPI, Request
 import httpx
+import os
+from dotenv import load_dotenv
 from graph import ai_reviewer_graph
 
+load_dotenv()
 app = FastAPI()
+
+# The token we just saved
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 @app.get("/")
 async def home():
@@ -10,35 +16,31 @@ async def home():
 
 @app.post("/webhook")
 async def github_webhook(request: Request):
-    # Parse the incoming JSON payload from GitHub
     payload = await request.json()
-    event_action = payload.get("action")
     
-    print(f"\n=== NEW WEBHOOK EVENT ===")
-    print(f"Action: {event_action}")
-    
-    # We only care if the payload contains Pull Request data
-    if "pull_request" in payload:
-        diff_url = payload["pull_request"]["diff_url"]
-        print(f"Fetching diff from: {diff_url}")
+    if "pull_request" in payload and payload.get("action") in ["opened", "synchronize"]:
+        pr_data = payload["pull_request"]
+        diff_url = pr_data["diff_url"]
+        comments_url = pr_data["comments_url"] # Where we send the AI feedback
         
-        # Download the raw code changes using httpx
         async with httpx.AsyncClient() as client:
-            response = await client.get(diff_url)
-            
-            if response.status_code == 200:
-                code_diff = response.text
-                print("Diff fetched successfully! Sending to AI...")
+            # 1. Fetch the diff
+            diff_response = await client.get(diff_url)
+            if diff_response.status_code == 200:
+                code_diff = diff_response.text
                 
-                # --- PASS THE DATA TO LANGGRAPH ---
-                # This triggers the graph.py logic and waits for the LLM
+                # 2. Get AI Feedback
                 result = ai_reviewer_graph.invoke({"code_diff": code_diff})
+                ai_feedback = result["feedback"]
                 
-                print("\n=== AI REVIEW FEEDBACK ===")
-                print(result["feedback"])
-                print("==========================\n")
+                # 3. Post the comment back to GitHub!
+                headers = {
+                    "Authorization": f"Bearer {GITHUB_TOKEN}",
+                    "Accept": "application/vnd.github.v3+json"
+                }
+                comment_payload = {"body": f"🤖 **AI Code Review:**\n\n{ai_feedback}"}
                 
-            else:
-                print(f"Failed to fetch diff. Status: {response.status_code}")
+                await client.post(comments_url, headers=headers, json=comment_payload)
+                print("✅ Successfully posted AI review to GitHub!")
                 
     return {"status": "success"}
