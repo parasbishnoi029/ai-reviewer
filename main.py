@@ -10,10 +10,9 @@ from supabase import create_client, Client
 load_dotenv()
 app = FastAPI()
 
-# Load all 4 keys from the environment
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-SUPABASE_URL = os.getenv(https://ylevykwrsbkjoexwznaw.supabase.co)
-SUPABASE_KEY = os.getenv(sb_publishable_i0iKJaN7QDdwRp0yGg82vQ_uMAMLVT0)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 # Initialize the cloud database connection
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
