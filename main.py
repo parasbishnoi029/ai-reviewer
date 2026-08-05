@@ -5,6 +5,8 @@ import requests
 from fastapi import FastAPI, Request, HTTPException, Header
 from tasks import process_pr_review
 from dotenv import load_dotenv
+from pydantic import BaseModel
+from graph import ai_reviewer_graph
 
 load_dotenv()
 
@@ -30,6 +32,14 @@ async def verify_github_signature(request: Request, signature_header: str):
     if not hmac.compare_digest(signature_header, expected_signature):
         raise HTTPException(status_code=403, detail="Signature mismatch! Unauthorized payload.")
 
+class CodePayload(BaseModel):
+    code: str
+
+@app.post("/manual-review")
+async def manual_review(payload: CodePayload):
+    # Runs instantly (no celery) for the live chat UI
+    result = ai_reviewer_graph.invoke({"code_diff": payload.code})
+    return {"feedback": result.get("feedback", "")}
 @app.post("/webhook")
 async def github_webhook(request: Request, x_hub_signature_256: str = Header(None)):
     # 1. Enforce Security
