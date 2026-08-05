@@ -60,14 +60,10 @@ async def github_webhook(request: Request, x_hub_signature_256: str = Header(Non
             
     return {"status": "ignored", "message": "Event type not supported or ignored."}
 
-# --- Updated Models for Chat Memory ---
-class ChatMessage(BaseModel):
-    role: str
-    content: str
+# ... (Keep all your imports, webhook, and verification logic at the top) ...
 
 class ManualReviewPayload(BaseModel):
     code: str
-    history: List[ChatMessage] = []
 
 @app.post("/manual-review")
 async def manual_review(payload: ManualReviewPayload, api_key: str = Depends(verify_api_key)):
@@ -76,11 +72,11 @@ async def manual_review(payload: ManualReviewPayload, api_key: str = Depends(ver
         
     from graph import ai_reviewer_graph
     try:
-        # Pass both the prompt and the history to LangGraph
+        # Pass only the code prompt to LangGraph
         result = ai_reviewer_graph.invoke({
-            "code_diff": payload.code,
-            "chat_history": [h.model_dump() for h in payload.history]
+            "code_diff": payload.code
         })
         return {"feedback": result.get("feedback", "No response generated.")}
     except Exception as e:
+        return {"feedback": f"Error generating response: {str(e)}"}
         return {"feedback": f"Error generating response: {str(e)}"}
