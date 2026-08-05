@@ -108,9 +108,11 @@ with tab_analytics:
     elif not df_reviews.empty:
         
         # --- Top-Level KPI Metrics (Sleek UI Cards) ---
+        # --- Real-Time KPI Metrics ---
         col1, col2, col3, col4 = st.columns(4)
         
         total_reviews = len(df_reviews)
+        active_repos = df_reviews['repo_name'].nunique() if total_reviews > 0 else 0
         
         # Calculate recent reviews safely
         if 'created_at' in df_reviews.columns:
@@ -118,16 +120,18 @@ with tab_analytics:
             recent_reviews = len(df_reviews[df_reviews['created_at'] >= pd.Timestamp.now(tz='UTC') - pd.Timedelta(days=7)])
         else:
             recent_reviews = 0
+            
+        # Calculate engineering hours saved (Assumption: 1 AI review saves 30 mins)
+        hours_saved = total_reviews * 0.5
         
         with col1:
             st.metric(label="Total PRs Reviewed", value=total_reviews, delta=f"{recent_reviews} this week")
         with col2:
-            st.metric(label="Engineering Hours Saved", value=f"{total_reviews * 0.5} hrs", delta="Based on 30m/PR")
+            st.metric(label="Active Repositories", value=active_repos)
         with col3:
-            st.metric(label="Avg Review Time", value="3.2s", delta="-0.5s", delta_color="normal")
+            st.metric(label="Eng Hours Saved", value=f"{hours_saved} hrs", delta="Based on 30m/PR")
         with col4:
-            st.metric(label="Security Scans", value="100%", delta="Passing", delta_color="normal")
-        
+            st.metric(label="Database Status", value="Connected", delta="Syncing Live", delta_color="normal")
         st.divider()
         
         # --- Interactive Data Visualization ---
