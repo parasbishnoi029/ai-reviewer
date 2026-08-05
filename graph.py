@@ -8,7 +8,7 @@ class GraphState(TypedDict):
     code_diff: str
     feedback: str
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
+llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite")
 
 def reviewer_node(state: GraphState):
     code_diff = state.get("code_diff", "")
