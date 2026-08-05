@@ -25,6 +25,7 @@ jobs:
         
     - name: Run Tests
       env:
+        PYTHONPATH: .
         ENVIRONMENT: development
         GOOGLE_API_KEY: "dummy_gemini_key_for_testing"
         SUPABASE_URL: "https://dummy.supabase.co"
