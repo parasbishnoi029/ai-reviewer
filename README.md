@@ -1,851 +1,298 @@
-# 🛡️ Aegis AI
+# Aegis AI
 
-### AI-Powered DevSecOps Code Review & Pull Request Intelligence
+> **Your always-on AI reviewer for faster, safer pull requests.**
 
-Aegis AI is an AI-powered DevSecOps code review platform that analyzes source code and GitHub pull requests for **security, performance, reliability, and code-quality concerns**.
+[![Build](https://img.shields.io/github/actions/workflow/status/YOUR_GITHUB_USERNAME/aegis-ai/ci.yml?branch=main&label=build)](../../actions)
+[![License](https://img.shields.io/github/license/YOUR_GITHUB_USERNAME/aegis-ai)](LICENSE)
+[![Issues](https://img.shields.io/github/issues/YOUR_GITHUB_USERNAME/aegis-ai)](../../issues)
+[![Pull requests](https://img.shields.io/github/issues-pr/YOUR_GITHUB_USERNAME/aegis-ai)](../../pulls)
+[![Stars](https://img.shields.io/github/stars/YOUR_GITHUB_USERNAME/aegis-ai?style=social)](../../stargazers)
 
-Powered by **Google Gemini and LangGraph**, Aegis AI transforms code into a structured engineering audit containing an **overall score, risk level, executive summary, validated strengths, severity-classified findings, confidence indicators, issue-linked fixes, and refactored code**.
+<!-- Replace YOUR_GITHUB_USERNAME and the workflow filename above before publishing. -->
 
-The platform combines **FastAPI, LangGraph, Gemini, Celery, Redis, Supabase, Streamlit, and the GitHub API** to provide both interactive code analysis and automated pull-request reviews.
+<p align="center">
+  <img src="docs/images/aegis-dashboard.png" alt="Aegis AI dashboard" width="860" />
+</p>
 
----
+<p align="center"><em>Screenshot placeholder — add <code>docs/images/aegis-dashboard.png</code>.</em></p>
 
-## ✨ Core Features
+## Overview
 
-### 📊 Code Quality Scoring
+**Aegis AI** is an AI-assisted code-review platform for GitHub repositories. It receives pull-request events, analyses the changed code, produces focused review feedback, and gives teams a dashboard for reviewing activity and trends.
 
-Every review provides an overall score:
+The project is meant to improve review coverage and shorten feedback loops. It is not a substitute for human review: generated feedback can be wrong, incomplete, or inappropriate for a repository’s conventions. Treat it as a second pair of eyes, then make the final decision as a developer.
 
-```text
-Overall Score: 90 / 100
-Risk Level: Low
+## Key features
+
+- **Pull-request reviews** — analyse changed files and publish structured feedback.
+- **Line-level suggestions** — attach actionable comments to relevant code when context permits.
+- **Severity and categories** — classify findings such as bugs, security, performance, maintainability, and style.
+- **Repository-aware rules** — pass repository guidance, coding standards, and ignored paths into the review context.
+- **GitHub webhook integration** — trigger reviews from pull-request events.
+- **Review dashboard** — inspect recent reviews, findings, repositories, and activity.
+- **Analytics** — track review volume, finding categories, and trends over time.
+- **Human-in-control workflow** — configure approval, publishing, and exclusion behaviour to fit the team.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Dev[Developer opens or updates a PR] --> GH[GitHub]
+    GH -->|pull_request webhook| API[Aegis API]
+    API --> Verify[Webhook signature verification]
+    Verify --> Queue[Review job queue]
+    Queue --> Collector[Diff and repository-context collector]
+    Collector --> Engine[AI review engine]
+    Engine --> Policy[Policy and output validation]
+    Policy --> Store[(Database)]
+    Policy -->|review / comments| GH
+    Store --> Dashboard[Web dashboard]
+    Dashboard --> Team[Engineering team]
 ```
 
-The score gives developers a quick summary of the review before they inspect individual findings.
+## How a review works
 
-It should be interpreted together with the detailed findings rather than treated as an absolute measurement of software quality.
+1. A contributor opens or updates a pull request.
+2. GitHub sends a signed webhook to Aegis AI.
+3. Aegis verifies the signature and creates a review job.
+4. The job collects the pull-request diff and allowed repository context.
+5. The AI review engine evaluates changes against your configured guidance.
+6. Aegis validates and stores the output, then posts a review or draft feedback to GitHub.
+7. The dashboard records the result for later inspection and analytics.
 
----
+> Keep webhook payloads and repository context minimal. Sending secrets, customer data, or unreviewed production data to an external model provider is a security mistake, not a feature.
 
-### 📝 Executive Summary
+## Screenshots
 
-Aegis AI generates a concise summary describing:
+| Dashboard | Pull-request review |
+| --- | --- |
+| ![Dashboard placeholder](docs/images/dashboard-placeholder.png) | ![PR review placeholder](docs/images/pr-review-placeholder.png) |
+| Add a dashboard screenshot at `docs/images/dashboard-placeholder.png`. | Add a GitHub review screenshot at `docs/images/pr-review-placeholder.png`. |
 
-- Overall code quality
-- Important security observations
-- Performance characteristics
-- Main engineering concerns
-- General review outcome
+## Getting started
 
-Example:
+### Prerequisites
 
-```text
-Executive Summary:
+- Git
+- A supported runtime for this repository (for example, Node.js or Python)
+- A GitHub account with permission to create a GitHub App or webhook
+- An API key for the configured AI provider
+- A database supported by the application, if persistence is enabled
 
-The code follows several strong security and asynchronous
-programming practices, while a small number of reliability
-and performance improvements may still be appropriate.
+### Installation
+
+> This repository snapshot was not supplied with source files, so package commands and exact runtime versions cannot be stated honestly here. Replace this section with the project’s actual commands once its stack is fixed.
+
+```bash
+git clone https://github.com/YOUR_GITHUB_USERNAME/aegis-ai.git
+cd aegis-ai
+
+# Install dependencies using the project’s package manager.
+# Examples: npm install | pnpm install | poetry install | pip install -r requirements.txt
+
+# Copy configuration and fill in real values.
+cp .env.example .env
+
+# Apply database migrations if your app uses them.
+# Start the API and dashboard using the scripts defined by the project.
 ```
 
----
+Open the local dashboard URL printed by the application. For webhook testing, expose the local server through a secure tunnel and use that HTTPS URL in GitHub.
 
-### 🌟 Validated Pros
+## Configuration
 
-Aegis AI identifies engineering practices that are already implemented well.
+Create a `.env` file from `.env.example`. Never commit it.
 
-Examples include:
+| Variable | Required | Description |
+| --- | :---: | --- |
+| `APP_ENV` | No | Application environment, such as `development` or `production`. |
+| `APP_URL` | Yes | Public base URL used by GitHub callbacks. |
+| `DATABASE_URL` | If used | Connection string for the application database. |
+| `GITHUB_APP_ID` | Yes | GitHub App identifier. |
+| `GITHUB_PRIVATE_KEY` | Yes | GitHub App private key, usually stored securely rather than inline. |
+| `GITHUB_WEBHOOK_SECRET` | Yes | Shared secret for verifying GitHub webhook signatures. |
+| `AI_PROVIDER_API_KEY` | Yes | API key for the selected AI provider. |
+| `AI_MODEL` | No | Model identifier to use for reviews. |
+| `REVIEW_MAX_FILES` | No | Upper limit for files examined in one review. |
+| `REVIEW_IGNORE_PATHS` | No | Comma-separated paths to skip, such as generated files. |
+| `LOG_LEVEL` | No | Logging verbosity. |
 
-- Input validation
-- Secure coding patterns
-- Asynchronous programming
-- Error handling
-- Resource management
-- Clear implementation patterns
+Use a secret manager in deployment. Environment files are acceptable for local development only.
 
-This allows the review to distinguish between code that should be preserved and code that should be changed.
+## Project structure
 
----
-
-### 🚨 Structured Findings
-
-Detected issues are presented using structured metadata.
-
-Example:
-
-```text
-[LOW | Performance | Confidence: High]
-
-Location:
-check_server_status
-
-Finding:
-Creating a new network client for every invocation may
-prevent connection reuse across repeated calls.
-```
-
-Each finding can contain:
-
-- **Severity**
-- **Category**
-- **Confidence**
-- **Code location**
-- **Technical explanation**
-
----
-
-### 🛠️ Issue-Linked Fixes
-
-Every recommendation is connected to the finding it addresses.
-
-Example:
+This is the recommended layout for Aegis AI. Adjust it to match the actual repository rather than pretending it already exists.
 
 ```text
-🔧 Fix for check_server_status [Performance]
-
-Consider reusing a long-lived HTTP client when the
-function is called repeatedly so connections can be
-reused across operations.
-```
-
-This creates a clear relationship:
-
-```text
-Problem
-   ↓
-Severity + Category
-   ↓
-Confidence
-   ↓
-Recommended Fix
-```
-
----
-
-### 💻 Refactored Code
-
-For standalone snippets submitted through the Live Code Sandbox, Aegis AI can generate an improved implementation based on the review findings.
-
-```text
-Original Code
-      ↓
-AI Analysis
-      ↓
-Structured Findings
-      ↓
-Issue-Linked Fixes
-      ↓
-Refactored Code
-```
-
-Generated code should always be reviewed and tested before being used in production.
-
----
-
-# 🔍 Live Code Sandbox
-
-The Aegis AI Command Center provides an interactive environment for analyzing standalone code snippets.
-
-Paste code into the editor and run an AI-assisted review.
-
-A complete review can contain:
-
-```text
-🛡️ Aegis AI Code Audit Report
-
-📊 Executive Telemetry
-
-Overall Score: 90 / 100
-Risk Level: Low
-
-Executive Summary:
-[High-level analysis]
-
-🌟 Validated Pros
-
-✅ Good engineering practice
-✅ Security or performance strength
-
-🚨 Structured Findings & Cons
-
-[LOW | AppSec | Confidence: Medium]
-Finding description...
-
-[MEDIUM | Performance | Confidence: High]
-Finding description...
-
-🛠️ Issue-Linked Fixes
-
-🔧 Fix for finding #1...
-🔧 Fix for finding #2...
-
-💻 Validated Refactored Code
-
-[Improved implementation]
-```
-
----
-
-# 🧠 Review Structure
-
-Aegis AI transforms raw code into a structured engineering report:
-
-```text
-                    Submitted Code
-                          │
-                          ▼
-                  ┌───────────────┐
-                  │   Aegis AI    │
-                  │ Review Engine │
-                  └───────┬───────┘
-                          │
-              ┌───────────┴───────────┐
-              ▼                       ▼
-        Security Analysis      Performance Analysis
-              │                       │
-              └───────────┬───────────┘
-                          ▼
-                   Refactor Analysis
-                          │
-                          ▼
-                    Final Report
-                          │
-        ┌─────────────────┼─────────────────┐
-        │                 │                 │
-        ▼                 ▼                 ▼
-  Score & Risk          Pros            Findings
-                                            │
-                                            ▼
-                                      Linked Fixes
-                                            │
-                                            ▼
-                                     Refactored Code
-```
-
----
-
-# 📋 Review Report
-
-A complete Aegis AI review is divided into five major sections.
-
-## 1. 📊 Executive Telemetry
-
-Provides the high-level review result:
-
-```text
-Overall Score
-Risk Level
-Executive Summary
-```
-
-This allows developers to understand the general condition of the code quickly.
-
----
-
-## 2. 🌟 Validated Pros
-
-Highlights good engineering decisions already present in the implementation.
-
-Aegis AI attempts to preserve these strengths during refactoring.
-
----
-
-## 3. 🚨 Structured Findings & Cons
-
-Potential issues are classified using:
-
-```text
-Severity
-   │
-   ├── Critical
-   ├── High
-   ├── Medium
-   └── Low
-
-Category
-   │
-   ├── AppSec
-   ├── Performance
-   └── Other supported review categories
-
-Confidence
-   │
-   ├── High
-   ├── Medium
-   └── Low
-```
-
-This helps developers distinguish serious findings from lower-priority observations.
-
----
-
-## 4. 🛠️ Issue-Linked Fixes
-
-Recommendations are linked directly to their corresponding findings.
-
-Instead of only reporting:
-
-```text
-"This code has a problem."
-```
-
-Aegis AI attempts to answer:
-
-```text
-What is the problem?
-        ↓
-Where is it?
-        ↓
-How serious is it?
-        ↓
-How confident is the review?
-        ↓
-Why does it matter?
-        ↓
-How can it be improved?
-```
-
----
-
-## 5. 💻 Refactored Code
-
-For standalone code analysis, Aegis AI can produce an improved version incorporating recommended changes.
-
-This turns the system from a simple issue detector into an AI-assisted review and remediation workflow.
-
----
-
-# 🔄 Automated GitHub PR Reviews
-
-Aegis AI can also review GitHub pull requests automatically.
-
-Supported events include:
-
-```text
-pull_request.opened
-pull_request.synchronize
-```
-
-The workflow:
-
-```text
-Developer opens / updates PR
-              │
-              ▼
-        GitHub Webhook
-              │
-              ▼
-      HMAC Verification
-              │
-              ▼
-          FastAPI
-              │
-              ▼
-            Redis
-              │
-              ▼
-       Celery Worker
-              │
-              ▼
-      Retrieve PR Diff
-              │
-              ▼
-     LangGraph + Gemini
-              │
-              ▼
-     Structured AI Review
-              │
-        ┌─────┴─────┐
-        ▼           ▼
-     GitHub      Supabase
-     Feedback    Persistence
-                    │
-                    ▼
-                 Analytics
-```
-
-Heavy AI processing is performed asynchronously rather than inside the GitHub webhook request.
-
----
-
-# 🏗️ System Architecture
-
-```text
-                       ┌──────────────────┐
-                       │    GitHub PR     │
-                       └────────┬─────────┘
-                                │
-                                ▼
-                       ┌──────────────────┐
-                       │     FastAPI      │
-                       │ Webhook Gateway  │
-                       │ HMAC Validation  │
-                       └────────┬─────────┘
-                                │
-                                ▼
-                       ┌──────────────────┐
-                       │      Redis       │
-                       │   Task Broker    │
-                       └────────┬─────────┘
-                                │
-                                ▼
-                       ┌──────────────────┐
-                       │  Celery Worker   │
-                       └────────┬─────────┘
-                                │
-                                ▼
-                       ┌──────────────────┐
-                       │    LangGraph     │
-                       │        +         │
-                       │     Gemini AI    │
-                       └────────┬─────────┘
-                                │
-                    ┌───────────┴───────────┐
-                    ▼                       ▼
-            ┌───────────────┐       ┌───────────────┐
-            │ GitHub Review │       │   Supabase    │
-            │   Feedback    │       │ Review History│
-            └───────────────┘       └───────┬───────┘
-                                            │
-                                            ▼
-                                    ┌───────────────┐
-                                    │   Streamlit   │
-                                    │Command Center │
-                                    └───────────────┘
-```
-
----
-
-# 📊 Command Center
-
-Aegis AI includes a Streamlit-based Command Center.
-
-It provides two main areas:
-
-### 🔍 Live Code Sandbox
-
-Submit standalone code and receive:
-
-- Overall score
-- Risk level
-- Executive summary
-- Validated pros
-- Structured findings
-- Severity classification
-- Finding category
-- Confidence level
-- Issue-linked fixes
-- Refactored code
-
-### 📊 Analytics
-
-Review historical activity stored in Supabase and monitor code-review activity across repositories.
-
----
-
-# 🛠️ Technology Stack
-
-| Technology | Role |
-|---|---|
-| **Python** | Core application language |
-| **Google Gemini** | AI code analysis |
-| **LangGraph** | Review workflow orchestration |
-| **FastAPI** | API and GitHub webhook gateway |
-| **Celery** | Background processing |
-| **Redis** | Task broker |
-| **Supabase** | Review persistence |
-| **Streamlit** | Command Center |
-| **GitHub API** | Pull-request integration |
-| **Pydantic** | Structured AI output validation |
-| **Pytest** | Automated testing |
-| **GitHub Actions** | Continuous integration |
-
----
-
-# 📂 Project Structure
-
-```text
-ai-reviewer/
-│
-├── .github/
-│   └── workflows/
-│
-├── examples/
-├── tests/
-│
-├── main.py
-├── graph.py
-├── tasks.py
-├── dashboard.py
-│
-├── requirements.txt
+aegis-ai/
+├── apps/
+│   ├── api/                 # Webhook receiver and API
+│   └── dashboard/           # Web dashboard
+├── packages/
+│   ├── review-engine/       # Diff analysis and AI orchestration
+│   ├── github-client/       # GitHub API integration
+│   └── shared/              # Shared types, validation, utilities
+├── db/                      # Schema, migrations, seed data
+├── docs/
+│   └── images/              # README screenshots and diagrams
+├── tests/                   # Unit, integration, and end-to-end tests
+├── .github/workflows/       # CI/CD workflows
 ├── .env.example
-├── .gitignore
-├── LICENSE
 └── README.md
 ```
 
-### `main.py`
+## API
 
-FastAPI backend responsible for:
+Prefix application endpoints with your deployed base URL. Protect dashboard and administrative endpoints with authentication and authorization.
 
-- GitHub webhook handling
-- HMAC signature verification
-- Manual review API
-- API authentication
-- Request validation
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Liveness/readiness health check. |
+| `POST` | `/webhooks/github` | Receives signed GitHub events. |
+| `GET` | `/api/reviews` | Lists reviews, with pagination and filters. |
+| `GET` | `/api/reviews/:id` | Returns one review and its findings. |
+| `POST` | `/api/reviews/:id/retry` | Re-queues an eligible failed review. |
+| `GET` | `/api/analytics/summary` | Returns dashboard summary metrics. |
+| `GET` | `/api/repositories` | Lists connected repositories. |
 
-### `graph.py`
+### Example webhook flow
 
-Contains the AI review workflow, including:
-
-- Security analysis
-- Performance analysis
-- Structured findings
-- Severity classification
-- Confidence classification
-- Pros generation
-- Refactoring
-- Score and risk generation
-- Final report formatting
-
-### `tasks.py`
-
-Handles asynchronous GitHub review operations:
-
-- PR diff retrieval
-- AI review execution
-- GitHub feedback
-- Supabase persistence
-
-### `dashboard.py`
-
-Provides the Streamlit Command Center:
-
-- Live Code Sandbox
-- Review reports
-- Code scores
-- Risk levels
-- Analytics
-
----
-
-# 🚀 Getting Started
-
-## 1. Clone the Repository
-
-```bash
-git clone https://github.com/parasbishnoi029/ai-reviewer.git
-cd ai-reviewer
+```http
+POST /webhooks/github
+X-GitHub-Event: pull_request
+X-Hub-Signature-256: sha256=<signature>
+Content-Type: application/json
 ```
 
-## 2. Create a Virtual Environment
+Return a fast `2xx` response after verification and process the review asynchronously. Doing full model analysis inside the webhook request makes delivery retries and timeouts much more likely.
 
-```bash
-python -m venv venv
-```
+## Dashboard and analytics
 
-### Windows
+The dashboard should answer practical questions, not produce decorative charts:
 
-```bash
-venv\Scripts\activate
-```
+- How many reviews ran this week, and how many failed?
+- Which repositories and pull requests have unresolved high-severity findings?
+- What categories recur most often?
+- How long does a review take from webhook receipt to publication?
+- Is the tool generating useful feedback or mostly noise?
 
-### Linux / macOS
+Recommended metrics:
 
-```bash
-source venv/bin/activate
-```
+| Metric | Why it matters |
+| --- | --- |
+| Reviews completed / failed | Shows operational reliability. |
+| Median review latency | Shows whether feedback arrives while it is still useful. |
+| Findings by severity and category | Reveals risk concentration and noise. |
+| Dismissed / accepted findings | A proxy for feedback quality; interpret carefully. |
+| Reviews by repository | Helps manage rollout and usage. |
 
-## 3. Install Dependencies
+## GitHub setup
 
-```bash
-pip install -r requirements.txt
-```
+### Preferred: GitHub App
 
----
+1. Create a GitHub App in your organization or account settings.
+2. Set the webhook URL to `https://YOUR_DOMAIN/webhooks/github`.
+3. Generate a strong webhook secret and save it as `GITHUB_WEBHOOK_SECRET`.
+4. Subscribe to the **Pull requests** event.
+5. Grant only the permissions Aegis needs. Usually this includes Pull requests: Read & write, Contents: Read, and Metadata: Read.
+6. Install the app only on repositories Aegis should review.
+7. Store the App ID and private key in your deployment secret manager.
 
-# ⚙️ Environment Configuration
+Avoid personal access tokens for a multi-repository product unless there is a narrow, temporary reason. GitHub Apps are scoped, auditable, and easier to revoke.
 
-Create a `.env` file:
+### Webhook validation
 
-```env
-GOOGLE_API_KEY=your_gemini_api_key
+For every delivery:
 
-GITHUB_TOKEN=your_github_token
-GITHUB_WEBHOOK_SECRET=your_webhook_secret
+- Verify `X-Hub-Signature-256` using constant-time comparison.
+- Reject missing or invalid signatures.
+- Check the event type and supported actions.
+- Record the GitHub delivery ID to make processing idempotent.
+- Return promptly and process the job in a worker.
 
-API_KEY=your_api_key
+## Testing
 
-REDIS_URL=redis://localhost:6379/0
+Use three layers of testing:
 
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_KEY=your_supabase_key
-```
+- **Unit tests** for diff parsing, prompt construction, validation, permissions, and signature verification.
+- **Integration tests** for GitHub payload handling, database persistence, queue processing, and provider adapters.
+- **End-to-end tests** for a complete pull-request event through to a rendered dashboard/review result.
 
-> Never commit API keys, access tokens, webhook secrets, or production credentials.
-
----
-
-# ▶️ Running Aegis AI
-
-### Start Redis
-
-```bash
-redis-server
-```
-
-### Start FastAPI
-
-```bash
-uvicorn main:app --reload
-```
-
-### Start Celery
-
-```bash
-celery -A tasks.celery_app worker --loglevel=info
-```
-
-### Start the Command Center
-
-```bash
-streamlit run dashboard.py
-```
-
-Typical local endpoints:
+Minimum checks before merging:
 
 ```text
-FastAPI:
-http://localhost:8000
-
-API Documentation:
-http://localhost:8000/docs
-
-Streamlit:
-http://localhost:8501
+formatting → lint → type checks → unit tests → integration tests → build
 ```
 
----
+Mock AI-provider responses in normal CI. Real model calls are slow, nondeterministic, potentially expensive, and belong only in a deliberately controlled evaluation environment.
 
-# 🔗 GitHub Webhook Setup
+## CI/CD
 
-Navigate to:
+A reliable pipeline should:
+
+1. Run formatting, linting, type checks, tests, and build on every pull request.
+2. Scan dependencies and secrets.
+3. Publish a deployable artifact only from protected branches or tagged releases.
+4. Run database migrations as a separate, observable deployment step.
+5. Perform a health check after deployment and roll back on failure.
+
+Example workflow layout:
 
 ```text
-GitHub Repository
-      ↓
-Settings
-      ↓
-Webhooks
-      ↓
-Add webhook
+.github/workflows/
+├── ci.yml          # Validate pull requests
+├── security.yml    # Dependency and secret scanning
+└── deploy.yml      # Controlled deployment
 ```
 
-Configure:
+## Security notes
 
-```text
-Payload URL:
-https://YOUR-DEPLOYED-API/github-webhook
-```
+- Never log tokens, private keys, webhook payloads containing secrets, or raw source code by default.
+- Validate GitHub signatures before queuing work.
+- Limit access to repositories, models, database records, and dashboard users.
+- Set strict size limits for diffs and context supplied to the model.
+- Redact known secrets before external model calls, but do not mistake redaction for a complete data-security strategy.
+- Use rate limits, idempotency keys, retry limits, and dead-letter handling for webhook jobs.
 
-Use the same secret configured in:
+## Roadmap
 
-```env
-GITHUB_WEBHOOK_SECRET=...
-```
+- [ ] GitHub App installation flow
+- [ ] Reliable asynchronous review queue
+- [ ] Repository-level review policies and ignore rules
+- [ ] Configurable severity thresholds
+- [ ] Pull-request summary and line-level comments
+- [ ] Team dashboard and review analytics
+- [ ] Evaluation suite for precision, recall, and reviewer acceptance
+- [ ] GitHub Actions and check-run integration
+- [ ] Multi-provider AI support
+- [ ] GitLab and Bitbucket integrations
 
-Enable pull-request events.
+## Contributing
 
----
+Contributions are welcome when they improve correctness, safety, or usability.
 
-# 🧪 Testing
+1. Fork the repository and create a focused branch.
+2. Make one coherent change at a time.
+3. Add or update tests for behavioural changes.
+4. Run the full local quality suite.
+5. Open a pull request that explains the problem, solution, limitations, and verification.
 
-Run:
+Do not submit generated formatting churn, unrelated refactors, secrets, or undocumented breaking changes. Small, testable pull requests are easier to review and more likely to be merged.
 
-```bash
-pytest tests/
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for project-specific standards when it is added.
 
-GitHub Actions can automatically execute repository checks when code is pushed or pull requests are created.
+## License
 
----
+This project is licensed under the [MIT License](LICENSE), unless the repository’s `LICENSE` file states otherwise.
 
-# 🔐 Security
+## Author
 
-Aegis AI includes several security controls around its infrastructure:
+Built and maintained by **Paras**.
 
-### HMAC Webhook Authentication
+- GitHub: [@parasbishnoi029](https://github.com/parasbishnoi029)
 
-Incoming GitHub webhooks are verified using HMAC SHA-256.
-
-### API Authentication
-
-Manual review requests require API-key authentication.
-
-### Request Size Limits
-
-Large code submissions and PR diffs are restricted to reduce excessive AI workloads.
-
-### Network Timeouts
-
-External API requests use explicit timeouts.
-
-### Structured AI Responses
-
-Important AI results are constrained using structured Pydantic models rather than relying entirely on free-form output.
+<!-- Replace the author and repository placeholders before publishing. -->
 
 ---
 
-# ✅ Current Capabilities
-
-- [x] AI-assisted code review
-- [x] Overall Code Quality Score
-- [x] Risk-level classification
-- [x] Executive review summary
-- [x] Validated pros
-- [x] Security analysis
-- [x] Performance analysis
-- [x] Structured findings
-- [x] Severity classification
-- [x] Finding categories
-- [x] Confidence classification
-- [x] Issue-linked fixes
-- [x] Refactored code generation
-- [x] LangGraph workflow
-- [x] Gemini integration
-- [x] FastAPI backend
-- [x] GitHub webhook integration
-- [x] HMAC webhook validation
-- [x] Automated PR reviews
-- [x] Celery background processing
-- [x] Redis task broker
-- [x] Supabase persistence
-- [x] Streamlit Command Center
-- [x] Review analytics
-- [x] Automated testing
-- [x] GitHub Actions CI
-
----
-
-# 🗺️ Roadmap
-
-The next phase focuses on making reviews more context-aware, reliable, and actionable.
-
-### AI Review Engine
-
-- [ ] Parallel Security, Performance, Quality, and Testing agents
-- [ ] Repository-aware context retrieval
-- [ ] Related-file and dependency context
-- [ ] Finding deduplication
-- [ ] Better false-positive filtering
-- [ ] Prompt-injection defenses
-- [ ] Deterministic score calibration
-- [ ] Review validation/evaluation stage
-
-### GitHub Integration
-
-- [ ] File and line-level findings
-- [ ] Inline GitHub suggestions
-- [ ] Automated PR verdicts
-- [ ] Duplicate webhook protection
-- [ ] Repository-specific `.aegis.yml` policies
-
-### Platform Engineering
-
-- [ ] Docker support
-- [ ] Docker Compose
-- [ ] Health and readiness endpoints
-- [ ] Advanced Celery retry policies
-- [ ] Expanded test coverage
-- [ ] Ruff linting
-- [ ] Static type checking
-- [ ] Dependency vulnerability scanning
-
-### Analytics
-
-- [ ] Average review score
-- [ ] Score history
-- [ ] Risk distribution
-- [ ] Severity distribution
-- [ ] Finding-category trends
-- [ ] Review latency
-- [ ] Failure rate
-- [ ] AI token usage
-- [ ] Estimated AI cost
-
----
-
-# ⚠️ Limitations
-
-Aegis AI uses a large language model to assist with code analysis.
-
-AI-generated reviews can contain:
-
-- False positives
-- Missed vulnerabilities
-- Incorrect severity classifications
-- Incorrect confidence estimates
-- Unnecessary optimizations
-- Incorrect refactoring recommendations
-- Imperfect quality scores
-
-Aegis AI should therefore be treated as an **engineering assistant**, not as a replacement for:
-
-- Human code review
-- Automated tests
-- Static-analysis tools
-- Dependency scanners
-- Security testing
-- Professional security audits
-
-Always inspect and test generated code before using it in production.
-
----
-
-# 🎯 Design Principle
-
-> **AI should assist engineering judgment, not replace it.**
-
-Aegis AI combines AI-assisted reasoning with conventional backend engineering to make code reviews faster, structured, and more actionable.
-
----
-
-# 🤝 Contributing
-
-Contributions and suggestions are welcome.
-
-```text
-1. Fork the repository
-2. Create a feature branch
-3. Implement your changes
-4. Add or update tests
-5. Open a pull request
-```
-
----
-
-# 📄 License
-
-This project is licensed under the **MIT License**.
-
-See `LICENSE` for details.
-
----
-
-# 👨‍💻 Author
-
-**Paras**
-
-GitHub: **@parasbishnoi029**
-
----
-
-## ⭐ Support
-
-If you find Aegis AI useful, consider starring the repository.
-
----
-
-### 🛡️ Aegis AI
-
-**Analyze. Score. Explain. Fix.**
+If Aegis AI saves your team time, consider starring the repository. More importantly, report false positives and missed issues—those signals are what make an AI reviewer useful.
