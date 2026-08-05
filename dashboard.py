@@ -1,5 +1,5 @@
 import logging
-import os 
+import os
 
 import pandas as pd
 import requests
@@ -38,17 +38,42 @@ st.set_page_config(
 
 # ============================================================
 # CONFIGURATION
+# Supports:
+# - Streamlit Cloud (st.secrets)
+# - Render / other host environment variables
+# - Local .env
 # ============================================================
 
-BACKEND_URL = os.environ.get(
+def get_config(name: str, default: str = "") -> str:
+    """Resolve a config value, preferring st.secrets, then env vars."""
+
+    try:
+        if name in st.secrets:
+            value = st.secrets[name]
+            if value:
+                return str(value)
+    except Exception:
+        # st.secrets raises if no secrets.toml exists at all (e.g. local dev)
+        pass
+
+    value = os.getenv(name)
+
+    if value:
+        return value
+
+    return default
+
+
+BACKEND_URL = get_config(
     "BACKEND_URL",
     "http://127.0.0.1:8000",
 ).rstrip("/")
 
-API_KEY = os.environ.get(
-    "API_KEY",
-    "",
-).strip()
+API_KEY = get_config("API_KEY").strip()
+
+SUPABASE_URL = get_config("SUPABASE_URL").strip()
+
+SUPABASE_KEY = get_config("SUPABASE_KEY").strip()
 
 
 # ============================================================
@@ -62,17 +87,7 @@ def init_db():
 
         from supabase import create_client
 
-        url = os.environ.get(
-            "SUPABASE_URL",
-            "",
-        ).strip()
-
-        key = os.environ.get(
-            "SUPABASE_KEY",
-            "",
-        ).strip()
-
-        if not url or not key:
+        if not SUPABASE_URL or not SUPABASE_KEY:
 
             logger.warning(
                 "Supabase credentials "
@@ -82,8 +97,8 @@ def init_db():
             return None
 
         return create_client(
-            url,
-            key,
+            SUPABASE_URL,
+            SUPABASE_KEY,
         )
 
     except Exception:
@@ -116,7 +131,23 @@ def load_data():
         response = (
             supabase
             .table("reviews")
-            .select("*")
+            .select(
+                """
+                repo_name,
+                pr_number,
+                overall_score,
+                risk_level,
+                issue_count,
+                critical_count,
+                high_count,
+                medium_count,
+                low_count,
+                review_duration_ms,
+                created_at
+                """
+            )
+            .order("created_at", desc=True)
+            .limit(500)
             .execute()
         )
 
@@ -300,10 +331,11 @@ with tab_review:
                         },
 
                         # Connection timeout,
-                        # then read timeout.
+                        # then read timeout. LLM-backed
+                        # reviews can take a while.
                         timeout=(
-                            5,
-                            120,
+                            10,
+                            300,
                         ),
                     )
 
@@ -340,6 +372,10 @@ with tab_review:
                                 {},
                             )
                         )
+
+                        feedback = payload.get(
+                            "feedback"
+                        ) or "No review was returned."
 
 
                         # ====================================
@@ -423,14 +459,21 @@ with tab_review:
                         # MARKDOWN REPORT
                         # ====================================
 
-                        st.markdown(
-                            payload.get(
-                                "feedback",
-                                (
-                                    "No review "
-                                    "was returned."
-                                ),
+                        st.markdown(feedback)
+
+                        with st.expander(
+                            "View raw markdown"
+                        ):
+                            st.code(
+                                feedback,
+                                language="markdown",
                             )
+
+                        st.download_button(
+                            "Download Report",
+                            feedback,
+                            file_name="review.md",
+                            mime="text/markdown",
                         )
 
 
@@ -462,10 +505,14 @@ with tab_review:
                         st.error(
                             (
                                 "Aegis API returned "
-                                f"{response.status_code}: "
-                                f"{detail}"
+                                f"{response.status_code}."
                             )
                         )
+
+                        with st.expander(
+                            "API error details"
+                        ):
+                            st.code(str(detail))
 
 
                 # ============================================
