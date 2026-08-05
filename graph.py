@@ -7,22 +7,31 @@ from langchain_core.messages import SystemMessage, HumanMessage
 class GraphState(TypedDict):
     code_diff: str
     feedback: str
-# Change this:
-# llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
 
-# To this:
-llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash")
+# Initialize the free Gemini model
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
 
 def reviewer_node(state: GraphState):
     code_diff = state.get("code_diff", "")
     
-    sys_msg = SystemMessage(content="You are a senior software engineer conducting a code review. Analyze the provided code for security vulnerabilities, bugs, and performance issues. Provide your feedback in clean Markdown formatting.")
+    sys_msg = SystemMessage(content=(
+        "You are a senior software engineer conducting a code review. "
+        "Analyze the provided code for security vulnerabilities, bugs, and performance issues. "
+        "Provide your feedback in clean Markdown formatting with clear Python code blocks."
+    ))
     human_msg = HumanMessage(content=f"Here is the code:\n\n{code_diff}")
     
     # Send the messages to Gemini
     response = llm.invoke([sys_msg, human_msg])
     
-    return {"feedback": response.content}
+    # Cleanly extract text whether Gemini returns a raw string or a list of dictionaries
+    content = response.content
+    if isinstance(content, list):
+        feedback_text = "\n".join([part.get("text", "") for part in content if isinstance(part, dict)])
+    else:
+        feedback_text = str(content)
+    
+    return {"feedback": feedback_text}
 
 def build_graph():
     # Use the new StateGraph standard
