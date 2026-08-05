@@ -24,10 +24,10 @@ Aegis is meant to improve review coverage and shorten feedback loops. It is **no
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="docs/images/aegis-dashboard.png" alt="Aegis AI Command Center" width="860" />
+  <img src="aegis-dashboard.png" alt="Aegis AI Command Center" width="860" />
 </p>
 
-<p align="center"><em>Add a real screenshot at <code>docs/images/aegis-dashboard.png</code> before publishing.</em></p>
+<p align="center"><em>Add a real screenshot at <code>docs/images/aegis-dashboard.png</code> publishing.</em></p>
 
 ---
 
