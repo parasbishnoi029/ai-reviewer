@@ -222,6 +222,58 @@ def count_risk(
     )
 
 
+def risk_badge(risk_level: str | None) -> str:
+    """Return a colored, human-readable risk badge."""
+
+    normalized = (risk_level or "").strip().lower()
+
+    badges = {
+        "minimal": "🟢 Minimal",
+        "low": "🟢 Low",
+        "medium": "🟡 Medium",
+        "high": "🟠 High",
+        "critical": "🔴 Critical",
+    }
+
+    return badges.get(normalized, f"⚪ {risk_level or 'Unknown'}")
+
+
+def score_badge(score) -> str:
+    """Return a colored score string based on simple thresholds."""
+
+    try:
+        value = float(score)
+    except (TypeError, ValueError):
+        return "N/A"
+
+    if value >= 90:
+        dot = "🟢"
+    elif value >= 75:
+        dot = "🔵"
+    elif value >= 50:
+        dot = "🟡"
+    else:
+        dot = "🔴"
+
+    return f"{dot} {value:.0f}/100"
+
+
+def get_field(payload: dict, *keys: str):
+    """Return the first present, non-empty value among candidate keys.
+
+    Backends label report sections differently (e.g. "summary" vs.
+    "executive_summary"), so this checks a few common variants rather
+    than assuming one exact key name.
+    """
+
+    for key in keys:
+        value = payload.get(key)
+        if value:
+            return value
+
+    return None
+
+
 # ============================================================
 # LOAD DATA
 # ============================================================
@@ -403,16 +455,12 @@ with tab_review:
 
                         metric_1.metric(
                             "Code Score",
-                            (
-                                f"{score}/100"
-                                if score is not None
-                                else "N/A"
-                            ),
+                            score_badge(score),
                         )
 
                         metric_2.metric(
                             "Risk Level",
-                            risk or "Unknown",
+                            risk_badge(risk),
                         )
 
                         metric_3.metric(
@@ -471,22 +519,155 @@ with tab_review:
 
 
                         # ====================================
-                        # MARKDOWN REPORT
+                        # STRUCTURED REPORT
                         # ====================================
 
-                        st.markdown(feedback)
+                        summary = get_field(
+                            payload,
+                            "summary",
+                            "executive_summary",
+                        )
+
+                        strengths = get_field(
+                            payload,
+                            "strengths",
+                            "pros",
+                        )
+
+                        findings = get_field(
+                            payload,
+                            "findings",
+                            "issues",
+                        )
+
+                        recommended_fixes = get_field(
+                            payload,
+                            "fixes",
+                            "recommendations",
+                        )
+
+                        refactored_code = get_field(
+                            payload,
+                            "refactored_code",
+                            "suggested_code",
+                            "code",
+                        )
+
+                        structured_sections_present = any(
+                            [
+                                summary,
+                                strengths,
+                                findings,
+                                recommended_fixes,
+                                refactored_code,
+                            ]
+                        )
+
+
+                        def render_section(value):
+                            """Render a section as markdown, handling
+                            both list-of-strings and markdown-string
+                            payload shapes."""
+
+                            if isinstance(value, list):
+                                st.markdown(
+                                    "\n".join(
+                                        f"- {item}" for item in value
+                                    )
+                                )
+                            else:
+                                st.markdown(str(value))
+
+
+                        if structured_sections_present:
+
+                            if summary:
+
+                                with st.expander(
+                                    "📋 Summary",
+                                    expanded=True,
+                                ):
+                                    render_section(summary)
+
+                            if strengths:
+
+                                with st.expander("✅ Strengths"):
+                                    render_section(strengths)
+
+                            if findings:
+
+                                with st.expander("🔍 Findings"):
+                                    render_section(findings)
+
+                            if recommended_fixes:
+
+                                with st.expander("🛠️ Fixes"):
+                                    render_section(recommended_fixes)
+
+                            if refactored_code:
+
+                                with st.expander("💻 Refactored Code"):
+                                    st.code(
+                                        str(refactored_code),
+                                        language="python",
+                                    )
+
+                        else:
+
+                            # Backend didn't return the expected
+                            # structured keys — fall back to the
+                            # single markdown report so nothing
+                            # is silently dropped.
+                            st.markdown(feedback)
+
 
                         with st.expander(
-                            "View raw markdown"
+                            "View raw response"
                         ):
-                            st.code(
-                                feedback,
-                                language="markdown",
-                            )
+                            st.json(payload)
+
+                        def as_markdown(value) -> str:
+                            if isinstance(value, list):
+                                return "\n".join(f"- {item}" for item in value)
+                            return str(value)
+
+
+                        if structured_sections_present:
+
+                            report_parts = []
+
+                            if summary:
+                                report_parts.append(
+                                    f"## Summary\n\n{as_markdown(summary)}"
+                                )
+                            if strengths:
+                                report_parts.append(
+                                    f"## Strengths\n\n{as_markdown(strengths)}"
+                                )
+                            if findings:
+                                report_parts.append(
+                                    f"## Findings\n\n{as_markdown(findings)}"
+                                )
+                            if recommended_fixes:
+                                report_parts.append(
+                                    f"## Fixes\n\n{as_markdown(recommended_fixes)}"
+                                )
+                            if refactored_code:
+                                report_parts.append(
+                                    "## Refactored Code\n\n"
+                                    f"```python\n{refactored_code}\n```"
+                                )
+
+                            downloadable_report = "\n\n".join(report_parts)
+
+                        else:
+
+                            downloadable_report = feedback
+
 
                         st.download_button(
                             "Download Report",
-                            feedback,
+                            downloadable_report,
                             file_name="review.md",
                             mime="text/markdown",
                         )
@@ -571,15 +752,45 @@ with tab_analytics:
 
     if df_reviews.empty:
 
-        st.info(
-            "No pull-request reviews yet. "
-            "Analytics will appear after Aegis AI "
-            "processes its first GitHub pull request."
+        st.markdown(
+            """
+<div style="text-align:center; padding: 2.5rem 1rem;">
+  <div style="font-size: 2.5rem;">📭</div>
+  <h3>No Reviews Yet</h3>
+  <p style="opacity:0.75;">
+    Analytics appear automatically once Aegis reviews its first GitHub pull request.
+  </p>
+</div>
+""",
+            unsafe_allow_html=True,
         )
+
+        step_1, arrow_1, step_2, arrow_2, step_3, arrow_3, step_4 = st.columns(
+            [3, 1, 3, 1, 3, 1, 3]
+        )
+
+        step_1.markdown("**🔗 Connect GitHub**\n\nSet up the webhook")
+        arrow_1.markdown(
+            "<div style='text-align:center; font-size:1.5rem;'>→</div>",
+            unsafe_allow_html=True,
+        )
+        step_2.markdown("**📤 Push a PR**\n\nOpen or update one")
+        arrow_2.markdown(
+            "<div style='text-align:center; font-size:1.5rem;'>→</div>",
+            unsafe_allow_html=True,
+        )
+        step_3.markdown("**⚙️ Webhook fires**\n\nCelery runs the review")
+        arrow_3.markdown(
+            "<div style='text-align:center; font-size:1.5rem;'>→</div>",
+            unsafe_allow_html=True,
+        )
+        step_4.markdown("**📊 Analytics appear**\n\nAutomatically")
+
+        st.divider()
 
         st.markdown(
             """
-### Start collecting review data
+##### Setup checklist
 
 1. Configure `GITHUB_WEBHOOK_SECRET`.
 2. Configure `GITHUB_TOKEN`.
@@ -587,9 +798,6 @@ with tab_analytics:
 4. Start the Celery worker.
 5. Configure the GitHub webhook.
 6. Open or update a pull request.
-
-Aegis will then review the PR and store
-structured analytics in Supabase.
 """
         )
 
@@ -1210,6 +1418,5 @@ structured analytics in Supabase.
 st.divider()
 
 st.caption(
-    "Aegis AI — Made by Paras  ;Powered by FastAPI, LangGraph, Gemini, "
-    "Supabase, and Streamlit."
+    "🛡️ Aegis AI  - Made by PARAS •  FastAPI · LangGraph · Gemini · Supabase · Streamlit"
 )
