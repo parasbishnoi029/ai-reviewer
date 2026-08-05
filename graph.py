@@ -1,3 +1,9 @@
+import os
+from dotenv import load_dotenv
+
+# 1. Load the environment variables FIRST
+load_dotenv()
+
 from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -7,8 +13,10 @@ class GraphState(TypedDict):
     code_diff: str
     feedback: str
 
-# Using the high-limit free tier model
+# 2. NOW initialize the model (it will automatically find GOOGLE_API_KEY in the environment)
 llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite")
+
+# ... (keep the rest of your reviewer_node and build_graph functions exactly the same)
 
 def reviewer_node(state: GraphState):
     code_diff = state.get("code_diff", "")
