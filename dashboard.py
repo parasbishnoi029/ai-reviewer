@@ -4,6 +4,7 @@ import requests
 import os
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
 # --- Page Configuration ---
@@ -43,59 +44,39 @@ st.markdown("Next-Generation DevSecOps Intelligence & Automated Code Reviews")
 st.divider()
 
 # --- Tabs ---
-tab1, tab2 = st.tabs(["💬 Conversational Assistant", "📊 Enterprise Analytics"])
+tab1, tab2 = st.tabs(["🔍 Live Code Sandbox", "📊 Enterprise Analytics"])
 
+# --- TAB 1: Live Code Sandbox ---
 with tab1:
-    st.write("Paste code for a DevSecOps review, or ask follow-up questions about vulnerabilities.")
+    st.markdown("### 🔍 Live Code Sandbox")
+    st.write("Paste any code snippet below for an instant, comprehensive AI review (Pros, Cons, Fixes, and Final Code).")
     
-    # Initialize chat history
-    if "messages" not in st.session_state:
-        st.session_state.messages = [
-            {"role": "assistant", "content": "Hello! I am Aegis AI. Paste your code below for an instant security scan, or ask me a question."}
-        ]
-
-    # Display chat messages from history on app rerun
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Accept user input
-    if prompt := st.chat_input("Paste code or ask a follow-up question..."):
-        # Display user message
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        # Display assistant response
-        with st.chat_message("assistant"):
-            with st.spinner("🤖 Analyzing..."):
+    code_input = st.text_area("Paste Python/Code Diff here:", height=250)
+    
+    if st.button("Run DevSecOps Review", type="primary"):
+        if not code_input.strip():
+            st.warning("Please paste some code first!")
+        else:
+            with st.spinner("🤖 Analyzing Code..."):
                 try:
                     BACKEND_URL = os.environ.get("BACKEND_URL", "http://127.0.0.1:8000")
                     API_KEY = os.environ.get("API_KEY", "dev-secret-key")
                     
-                    # Send prompt AND the history (excluding the current prompt we just added)
-                    payload = {
-                        "code": prompt,
-                        "history": st.session_state.messages[:-1] 
-                    }
-                    
                     response = requests.post(
                         f"{BACKEND_URL}/manual-review", 
-                        json=payload,
+                        json={"code": code_input},
                         headers={"X-API-Key": API_KEY}
                     )
                     
                     if response.status_code == 200:
-                        ai_reply = response.json().get("feedback", "No response generated.")
+                        st.success("Analysis Complete!")
+                        st.markdown(response.json().get("feedback", ""))
                     else:
-                        ai_reply = f"⚠️ API Error {response.status_code}: {response.text}"
-                        
-                    st.markdown(ai_reply)
-                    st.session_state.messages.append({"role": "assistant", "content": ai_reply})
-                    
+                        st.error(f"API Error {response.status_code}: {response.text}")
                 except Exception as e:
                     st.error(f"Connection to backend failed: {e}")
 
+# --- TAB 2: Enterprise Analytics ---
 with tab2:
     if df_reviews.empty:
         st.info("No enterprise data available yet. Waiting for GitHub webhooks...")
