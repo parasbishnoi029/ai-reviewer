@@ -1,7 +1,11 @@
 import streamlit as st
 import requests
 import os
+from dotenv import load_dotenv  # <-- Add this import
 from supabase import create_client, Client
+
+# Read variables from the local .env file and set them in the environment
+load_dotenv()                   # <-- Add this function call
 
 st.set_page_config(page_title="AI Code Reviewer", page_icon="🤖", layout="wide")
 
@@ -10,6 +14,7 @@ BACKEND_URL = os.getenv("BACKEND_URL", "https://ai-reviewer-backend-ofpx.onrende
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
+# ... (Keep the rest of your code exactly the same)
 st.title("🤖 AI Code Reviewer Control Center")
 st.markdown("Automated GitHub Pull Request Reviews & Interactive Code Playground")
 
