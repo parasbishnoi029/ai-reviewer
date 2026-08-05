@@ -14,4 +14,4 @@ def test_manual_review_unauthorized():
     """Ensure manual review requires an API key."""
     response = client.post("/manual-review", json={"code": "print('hello')"})
     # FastAPI can return 401 or 403 depending on the exact security implementation
-    assert response.status_code in [401, 403] 
+    assert response.status_code in [401, 403]
