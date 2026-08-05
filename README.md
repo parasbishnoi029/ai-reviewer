@@ -1,4 +1,4 @@
-```markdown
+
 # 🛡️ Aegis AI | Enterprise Code Command Center & Automated Reviewer
 
 [![Python](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
