@@ -1,157 +1,131 @@
 import streamlit as st
 import pandas as pd
-from supabase import create_client, Client
-import os
 import requests
+import os
 from dotenv import load_dotenv
-import time
 
 load_dotenv()
 
-# --- Page Configuration & Theming ---
-st.set_page_config(
-    page_title="Aegis AI | Code Command", 
-    page_icon="🛡️", 
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+# --- Page Configuration ---
+st.set_page_config(page_title="Aegis AI | DevSecOps", page_icon="🛡️", layout="wide")
 
-# --- Initialize Database with Caching ---
+# --- Database Connection ---
 @st.cache_resource
-def init_connection():
-    url = st.secrets.get("SUPABASE_URL", os.environ.get("SUPABASE_URL"))
-    key = st.secrets.get("SUPABASE_KEY", os.environ.get("SUPABASE_KEY"))
-    if not url or not key:
-        return None
-    return create_client(url, key)
-
-supabase = init_connection()
-
-# --- Fetch Data with TTL Caching ---
-@st.cache_data(ttl=60)
-def fetch_review_metrics():
-    if not supabase:
-        return pd.DataFrame()
+def init_db():
     try:
-        response = supabase.table("reviews").select("*").order("created_at", desc=True).execute()
-        return pd.DataFrame(response.data)
+        from supabase import create_client
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_KEY")
+        if url and key:
+            return create_client(url, key)
     except Exception as e:
-        return pd.DataFrame()
+        st.error(f"Database connection failed: {e}")
+    return None
 
-# --- Custom Header ---
-st.title("🛡️ Aegis AI | Code Command Center")
-st.caption("Next-Generation DevSecOps Intelligence & Automated Code Reviews")
+supabase = init_db()
 
-# Optional: A quick welcome toast animation when the app loads
-if 'welcomed' not in st.session_state:
-    st.toast('Welcome to Aegis AI Security Center!', icon='🚀')
-    st.session_state['welcomed'] = True
+# --- Fetch Data ---
+def load_data():
+    if supabase:
+        try:
+            response = supabase.table("reviews").select("*").execute()
+            if response.data:
+                return pd.DataFrame(response.data)
+        except Exception as e:
+            pass
+    return pd.DataFrame()
 
+df_reviews = load_data()
+
+# --- Dashboard Header ---
+st.title("🛡️ Aegis AI | Command Center")
+st.markdown("Next-Generation DevSecOps Intelligence & Automated Code Reviews")
 st.divider()
 
-# --- UI Layout: Tabs ---
-tab_chat, tab_analytics = st.tabs(["💬 Live Code Assistant", "📊 Enterprise Analytics"])
+# --- Tabs ---
+tab1, tab2 = st.tabs(["💬 Conversational Assistant", "📊 Enterprise Analytics"])
 
-# ==========================================
-# TAB 1: LIVE CODE ASSISTANT (RESTORED)
-# ==========================================
-with tab_chat:
-    st.subheader("Interactive AI Code Sandbox")
-    st.markdown("Paste any code snippet below for an instant, secure AI review before you push to GitHub.")
+with tab1:
+    st.write("Paste code for a DevSecOps review, or ask follow-up questions about vulnerabilities.")
     
-    code_input = st.text_area("Paste Python/Code Diff here:", height=250, placeholder="def example_function():\n    pass")
-    
-    col1, col2 = st.columns([1, 5])
-    with col1:
-        analyze_btn = st.button("🚀 Analyze Code", use_container_width=True)
-    
-    if analyze_btn:
-        if not code_input.strip():
-            st.warning("⚠️ Please enter some code to analyze.")
-        else:
-            # Animated loading state
-            with st.spinner("🤖 Aegis AI is scanning for vulnerabilities and optimizations..."):
+    # Initialize chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {"role": "assistant", "content": "Hello! I am Aegis AI. Paste your code below for an instant security scan, or ask me a question."}
+        ]
+
+    # Display chat messages from history on app rerun
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Accept user input
+    if prompt := st.chat_input("Paste code or ask a follow-up question..."):
+        # Display user message
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Display assistant response
+        with st.chat_message("assistant"):
+            with st.spinner("🤖 Analyzing..."):
                 try:
-                    # Pointing to your FastAPI manual review endpoint
-                    BACKEND_URL = os.environ.get("BACKEND_URL", "https://ai-reviewer-backend-ofpx.onrender.com")
-                    # Change this line in dashboard.py:
+                    BACKEND_URL = os.environ.get("BACKEND_URL", "http://127.0.0.1:8000")
+                    API_KEY = os.environ.get("API_KEY", "dev-secret-key")
+                    
+                    # Send prompt AND the history (excluding the current prompt we just added)
+                    payload = {
+                        "code": prompt,
+                        "history": st.session_state.messages[:-1] 
+                    }
+                    
                     response = requests.post(
                         f"{BACKEND_URL}/manual-review", 
-                        json={"code": code_input},
-                        headers={"X-API-Key": os.environ.get("API_KEY", "dev-secret-key")}
+                        json=payload,
+                        headers={"X-API-Key": API_KEY}
                     )
                     
                     if response.status_code == 200:
-                        data = response.json()
-                        feedback_text = data.get("feedback", "")
-                        
-                        # Trigger success animation!
-                        st.balloons()
-                        st.success("Analysis Complete! Zero critical blockers found.")
-                        
-                        # Display feedback in a clean expander or direct markdown
-                        st.markdown("### 💡 AI Feedback & Recommendations")
-                        st.markdown(feedback_text)
+                        ai_reply = response.json().get("feedback", "No response generated.")
                     else:
-                        st.error(f"Backend responded with error code: {response.status_code}")
+                        ai_reply = f"⚠️ API Error {response.status_code}: {response.text}"
+                        
+                    st.markdown(ai_reply)
+                    st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+                    
                 except Exception as e:
-                    st.error(f"Failed to connect to AI backend: {e}")
+                    st.error(f"Connection to backend failed: {e}")
 
-# ==========================================
-# TAB 2: ENTERPRISE ANALYTICS
-# ==========================================
-with tab_analytics:
-    df_reviews = fetch_review_metrics()
-
-    if supabase is None:
-        st.error("🔒 Supabase credentials missing. Please configure your environment variables.")
-    elif not df_reviews.empty:
-        
-        # --- Top-Level KPI Metrics (Sleek UI Cards) ---
-        # --- Real-Time KPI Metrics ---
+with tab2:
+    if df_reviews.empty:
+        st.info("No enterprise data available yet. Waiting for GitHub webhooks...")
+    else:
         col1, col2, col3, col4 = st.columns(4)
         
         total_reviews = len(df_reviews)
         active_repos = df_reviews['repo_name'].nunique() if total_reviews > 0 else 0
         
-        # Calculate recent reviews safely
         if 'created_at' in df_reviews.columns:
             df_reviews['created_at'] = pd.to_datetime(df_reviews['created_at'])
             recent_reviews = len(df_reviews[df_reviews['created_at'] >= pd.Timestamp.now(tz='UTC') - pd.Timedelta(days=7)])
         else:
             recent_reviews = 0
             
-        # Calculate engineering hours saved (Assumption: 1 AI review saves 30 mins)
         hours_saved = total_reviews * 0.5
         
         with col1:
-            st.metric(label="Total PRs Reviewed", value=total_reviews, delta=f"{recent_reviews} this week")
+            st.metric("Total PRs Reviewed", total_reviews, f"{recent_reviews} this week")
         with col2:
-            st.metric(label="Active Repositories", value=active_repos)
+            st.metric("Active Repositories", active_repos)
         with col3:
-            st.metric(label="Eng Hours Saved", value=f"{hours_saved} hrs", delta="Based on 30m/PR")
+            st.metric("Eng Hours Saved", f"{hours_saved} hrs", "Based on 30m/PR")
         with col4:
-            st.metric(label="Database Status", value="Connected", delta="Syncing Live", delta_color="normal")
-        st.divider()
-        
-        # --- Interactive Data Visualization ---
-        st.subheader("Repository Health & Review Logs")
-        
-        repo_filter = st.selectbox("Filter by Repository", ["All Repositories"] + list(df_reviews['repo_name'].unique()))
-        filtered_df = df_reviews if repo_filter == "All Repositories" else df_reviews[df_reviews['repo_name'] == repo_filter]
-        
-        # Display Clean Table
-        display_cols = ['pr_number', 'repo_name']
-        if 'created_at' in filtered_df.columns:
-            display_cols.append('created_at')
+            st.metric("Database Status", "Connected", "Syncing Live", delta_color="normal")
             
-        st.dataframe(filtered_df[display_cols], use_container_width=True, hide_index=True)
-        
-        # Detailed Expander View
-        st.markdown("### 📝 Detailed Review Logs")
-        for _, row in filtered_df.head(10).iterrows():
-            timestamp = row['created_at'].strftime("%Y-%m-%d %H:%M") if 'created_at' in row else "Unknown Date"
-            with st.expander(f"🚀 PR #{row['pr_number']} - {row['repo_name']} ({timestamp})"):
-                st.markdown(row.get("review_comment", "No review body available."))
-    else:
-        st.info("📡 Awaiting Data... Trigger a webhook from GitHub to generate your first enterprise log.")
+        st.divider()
+        st.markdown("### Recent Automated Reviews")
+        st.dataframe(
+            df_reviews[['created_at', 'repo_name', 'pr_number', 'review_comment']].sort_values(by='created_at', ascending=False),
+            use_container_width=True,
+            hide_index=True
+        )
