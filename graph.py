@@ -1,12 +1,17 @@
-from langgraph.graph import Graph
+from typing import TypedDict
+from langgraph.graph import StateGraph, START, END
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
+# Define the exact data our graph will pass around
+class GraphState(TypedDict):
+    code_diff: str
+    feedback: str
+
 # Initialize the free Gemini 1.5 Flash model
-# It will automatically look for the GOOGLE_API_KEY environment variable
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
 
-def reviewer_node(state: dict):
+def reviewer_node(state: GraphState):
     code_diff = state.get("code_diff", "")
     
     sys_msg = SystemMessage(content="You are a senior software engineer conducting a code review. Analyze the provided code for security vulnerabilities, bugs, and performance issues. Provide your feedback in clean Markdown formatting.")
@@ -18,9 +23,17 @@ def reviewer_node(state: dict):
     return {"feedback": response.content}
 
 def build_graph():
-    workflow = Graph()
+    # Use the new StateGraph standard
+    workflow = StateGraph(GraphState)
+    
+    # Add our node
     workflow.add_node("reviewer", reviewer_node)
-    workflow.set_entry_point("reviewer")
-    workflow.set_finish_point("reviewer")
+    
+    # Define the flow from START to reviewer to END
+    workflow.add_edge(START, "reviewer")
+    workflow.add_edge("reviewer", END)
+    
     return workflow.compile()
 
+# This is the graph that main.py imports
+ai_reviewer_graph = build_graph()
