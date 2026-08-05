@@ -7,9 +7,11 @@ from langchain_core.messages import SystemMessage, HumanMessage
 class GraphState(TypedDict):
     code_diff: str
     feedback: str
+# Change this:
+# llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
 
-# Initialize the free Gemini 1.5 Flash model
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
+# To this:
+llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash")
 
 def reviewer_node(state: GraphState):
     code_diff = state.get("code_diff", "")
