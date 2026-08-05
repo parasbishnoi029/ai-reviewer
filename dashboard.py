@@ -1210,6 +1210,6 @@ structured analytics in Supabase.
 st.divider()
 
 st.caption(
-    "Aegis AI — Powered by FastAPI, LangGraph, Gemini, "
+    "Aegis AI — Made by Paras  ;Powered by FastAPI, LangGraph, Gemini, "
     "Supabase, and Streamlit."
 )
