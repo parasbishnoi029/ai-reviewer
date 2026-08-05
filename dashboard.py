@@ -74,7 +74,12 @@ with tab_chat:
                 try:
                     # Pointing to your FastAPI manual review endpoint
                     BACKEND_URL = os.environ.get("BACKEND_URL", "https://ai-reviewer-backend-ofpx.onrender.com")
-                    response = requests.post(f"{BACKEND_URL}/manual-review", json={"code": code_input})
+                    # Change this line in dashboard.py:
+                    response = requests.post(
+                        f"{BACKEND_URL}/manual-review", 
+                        json={"code": code_input},
+                        headers={"X-API-Key": os.environ.get("API_KEY", "dev-secret-key")}
+                    )
                     
                     if response.status_code == 200:
                         data = response.json()
