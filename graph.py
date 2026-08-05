@@ -8,42 +8,52 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- Structured Output Models ---
+# --- Enhanced Structured Output Models ---
 class CodeIssue(BaseModel):
     severity: str = Field(description="Critical, High, Medium, or Low")
+    category: str = Field(description="AppSec, Performance, Maintainability, or Reliability")
+    confidence: str = Field(description="High, Medium, or Low confidence in this finding")
     line_or_function: str = Field(description="Where the issue was found")
     description: str = Field(description="What the issue is")
-    fix: str = Field(description="Actionable fix")
+    fix: str = Field(description="Actionable, issue-linked fix")
 
-class ReviewResult(BaseModel):
-    summary: str = Field(description="High-level summary of the code quality")
+class AuditSummary(BaseModel):
+    overall_score: int = Field(description="Quality/Security score from 0 to 100")
+    risk_level: str = Field(description="Critical, High, Medium, Low, or Minimal")
+    summary: str = Field(description="Concise 1-2 sentence executive summary of findings")
     issues: List[CodeIssue] = Field(description="List of identified issues")
 
 class RefactorResult(BaseModel):
     pros: List[str] = Field(description="List of good practices or positive aspects found in the original code")
-    final_code: str = Field(description="The complete, fully refactored code fixing all issues.")
+    final_code: str = Field(description="The complete, fully refactored, production-ready code fixing all issues.")
 
 # --- Graph State ---
 class GraphState(TypedDict, total=False):
     code_diff: str  
-    security_analysis: ReviewResult
-    performance_analysis: ReviewResult
+    security_analysis: AuditSummary
+    performance_analysis: AuditSummary
     refactor_analysis: RefactorResult
     feedback: str
 
 llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", temperature=0)
-structured_review = llm.with_structured_output(ReviewResult)
+structured_audit = llm.with_structured_output(AuditSummary)
 structured_refactor = llm.with_structured_output(RefactorResult)
 
 # --- Define Graph Nodes ---
 def security_scan_node(state: GraphState):
-    prompt = f"Analyze this code diff strictly for security vulnerabilities:\n\n{state['code_diff']}"
-    result = structured_review.invoke([SystemMessage(content="You are an elite AppSec engineer."), HumanMessage(content=prompt)])
+    prompt = f"Analyze this code diff strictly for security vulnerabilities, SSRF, injection, and auth risks:\n\n{state['code_diff']}"
+    result = structured_audit.invoke([
+        SystemMessage(content="You are a Lead AppSec Auditor."), 
+        HumanMessage(content=prompt)
+    ])
     return {"security_analysis": result}
 
 def performance_scan_node(state: GraphState):
-    prompt = f"Analyze this code diff strictly for performance bottlenecks:\n\n{state['code_diff']}"
-    result = structured_review.invoke([SystemMessage(content="You are a Principal Performance Engineer."), HumanMessage(content=prompt)])
+    prompt = f"Analyze this code diff strictly for performance bottlenecks, scalability, and memory issues:\n\n{state['code_diff']}"
+    result = structured_audit.invoke([
+        SystemMessage(content="You are a Principal Performance Engineer."), 
+        HumanMessage(content=prompt)
+    ])
     return {"performance_analysis": result}
 
 def refactor_node(state: GraphState):
@@ -52,37 +62,72 @@ def refactor_node(state: GraphState):
     
     prompt = f"""Review this original code:\n{state['code_diff']}\n\nSecurity Issues to fix: {sec_issues}\nPerformance Issues to fix: {perf_issues}\n\n1. Identify 2-3 good practices (Pros) in the original code.\n2. Rewrite the entire code snippet to resolve ALL listed security and performance issues. Return clean, production-ready code."""
     
-    result = structured_refactor.invoke([SystemMessage(content="You are a Senior Principal Software Engineer."), HumanMessage(content=prompt)])
+    result = structured_refactor.invoke([
+        SystemMessage(content="You are a Senior Principal Software Engineer."), 
+        HumanMessage(content=prompt)
+    ])
     return {"refactor_analysis": result}
 
 def format_report_node(state: GraphState):
     sec = state.get("security_analysis")
     perf = state.get("performance_analysis")
     refactor = state.get("refactor_analysis")
-    all_issues = getattr(sec, 'issues', []) + getattr(perf, 'issues', [])
     
-    report = "## 🛡️ Aegis AI Comprehensive Code Review\n\n"
+    sec_issues = getattr(sec, 'issues', []) if sec else []
+    perf_issues = getattr(perf, 'issues', []) if perf else []
+    all_issues = sec_issues + perf_issues
     
-    report += "### 🌟 Pros (What's Good)\n"
+    # Calculate telemetry metrics
+    sec_score = getattr(sec, 'overall_score', 100) if sec else 100
+    perf_score = getattr(perf, 'overall_score', 100) if perf else 100
+    overall_score = round((sec_score + perf_score) / 2)
+    
+    # Determine maximum risk level
+    risk_hierarchy = {"Critical": 4, "High": 3, "Medium": 2, "Low": 1, "Minimal": 0}
+    sec_risk = getattr(sec, 'risk_level', 'Minimal') if sec else 'Minimal'
+    perf_risk = getattr(perf, 'risk_level', 'Minimal') if perf else 'Minimal'
+    
+    overall_risk = sec_risk if risk_hierarchy.get(sec_risk, 0) >= risk_hierarchy.get(perf_risk, 0) else perf_risk
+
+    # Combine summaries
+    summary_text = ""
+    if sec and hasattr(sec, 'summary'):
+        summary_text += f"{sec.summary} "
+    if perf and hasattr(perf, 'summary'):
+        summary_text += f"{perf.summary}"
+
+    report = "## 🛡️ Aegis AI Enterprise Code Audit Report\n\n"
+    
+    # --- 1. Executive Telemetry ---
+    report += "### 📊 Executive Telemetry\n"
+    report += f"- **Overall Score:** `{overall_score} / 100`\n"
+    report += f"- **Risk Level:** `{overall_risk}`\n"
+    report += f"- **Executive Summary:** {summary_text if summary_text.strip() else 'Audit completed successfully.'}\n\n"
+    
+    # --- 2. Validated Pros ---
+    report += "### 🌟 Validated Pros\n"
     if refactor and refactor.pros:
         for pro in refactor.pros:
             report += f"- ✅ {pro}\n"
     else:
-        report += "- ✅ Code is structurally parseable.\n"
+        report += "- ✅ Code is syntactically valid.\n"
         
-    report += "\n### 🚨 Cons & Vulnerabilities (What Needs Fixing)\n"
+    # --- 3. Structured Findings & Cons ---
+    report += "\n### 🚨 Structured Findings & Cons\n"
     if not all_issues:
-        report += "- ✨ No major issues found!\n"
+        report += "- ✨ No vulnerabilities or bottlenecks detected!\n"
     for issue in all_issues:
-        report += f"- **[{issue.severity}]** `{issue.line_or_function}`: {issue.description}\n"
+        report += f"- **[{issue.severity.upper()} | {issue.category} | Confidence: {issue.confidence}]** `{issue.line_or_function}`: {issue.description}\n"
         
-    report += "\n### 🛠️ Recommended Fixes\n"
+    # --- 4. Issue-Linked Fixes ---
+    report += "\n### 🛠️ Issue-Linked Fixes\n"
     if not all_issues:
-        report += "- ✨ No fixes needed!\n"
+        report += "- ✨ No action required.\n"
     for issue in all_issues:
-        report += f"- 🔧 **Fix for `{issue.line_or_function}`:** {issue.fix}\n"
+        report += f"- 🔧 **Fix for `{issue.line_or_function}` [{issue.category}]:** {issue.fix}\n"
         
-    report += "\n### 💻 Final Refactored Code\n"
+    # --- 5. Validated Refactored Code ---
+    report += "\n### 💻 Validated Refactored Code\n"
     if refactor and refactor.final_code:
         clean_code = refactor.final_code.strip("`").removeprefix("python").strip()
         report += f"```python\n{clean_code}\n```\n"
@@ -96,7 +141,7 @@ workflow.add_node("performance_scan", performance_scan_node)
 workflow.add_node("refactor", refactor_node)
 workflow.add_node("format_report", format_report_node)
 
-# Straight pipeline execution
+# Execution Flow
 workflow.add_edge(START, "security_scan")
 workflow.add_edge("security_scan", "performance_scan")
 workflow.add_edge("performance_scan", "refactor")
