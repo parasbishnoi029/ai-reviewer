@@ -1,44 +1,26 @@
-from typing import TypedDict
-from langgraph.graph import StateGraph, START, END
-from langchain_openai import ChatOpenAI
+from langgraph.graph import Graph
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
-import os
-from dotenv import load_dotenv
 
-# Load the secret API key from the .env file
-load_dotenv()
+# Initialize the free Gemini 1.5 Flash model
+# It will automatically look for the GOOGLE_API_KEY environment variable
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
 
-# Define the data our graph will pass around
-class ReviewState(TypedDict):
-    code_diff: str
-    feedback: str
-
-# Initialize the LLM (using the mini model for speed and cost efficiency)
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-
-# Define our specialist node
-def reviewer_node(state: ReviewState):
-    sys_msg = SystemMessage(
-        content="You are a Senior Software Engineer. Review the following code diff. "
-                "Lines starting with '+' are additions, '-' are deletions. "
-                "Provide a brief, professional code review. Point out bugs, security flaws, "
-                "or praise good code. Keep it under 3 paragraphs."
-    )
-    human_msg = HumanMessage(content=state["code_diff"])
+def reviewer_node(state: dict):
+    code_diff = state.get("code_diff", "")
     
-    # Call the LLM
+    sys_msg = SystemMessage(content="You are a senior software engineer conducting a code review. Analyze the provided code for security vulnerabilities, bugs, and performance issues. Provide your feedback in clean Markdown formatting.")
+    human_msg = HumanMessage(content=f"Here is the code:\n\n{code_diff}")
+    
+    # Send the messages to Gemini
     response = llm.invoke([sys_msg, human_msg])
     
-    # Update the state with the LLM's feedback
     return {"feedback": response.content}
 
-# Build the State Machine
-builder = StateGraph(ReviewState)
-builder.add_node("reviewer", reviewer_node)
+def build_graph():
+    workflow = Graph()
+    workflow.add_node("reviewer", reviewer_node)
+    workflow.set_entry_point("reviewer")
+    workflow.set_finish_point("reviewer")
+    return workflow.compile()
 
-# Define the flow: START -> reviewer -> END
-builder.add_edge(START, "reviewer")
-builder.add_edge("reviewer", END)
-
-# Compile it into a runnable application
-ai_reviewer_graph = builder.compile()
