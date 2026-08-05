@@ -11,17 +11,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.12'
+        
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest httpx
+        
     - name: Run Tests
       env:
         ENVIRONMENT: development
+        GOOGLE_API_KEY: "dummy_gemini_key_for_testing"
+        SUPABASE_URL: "https://dummy.supabase.co"
+        SUPABASE_KEY: "dummy_supabase_key"
+        GITHUB_WEBHOOK_SECRET: "dummy_webhook_secret"
+        API_KEY: "dev-secret-key"
       run: |
         pytest tests/
