@@ -64,6 +64,21 @@ def get_config(name: str, default: str = "") -> str:
     return default
 
 
+def require_config(name: str) -> str:
+    """Resolve a mandatory config value, failing loudly if it's missing."""
+
+    value = get_config(name)
+
+    if not value:
+        st.error(
+            f"Missing required configuration: `{name}`. "
+            "Set it in Streamlit secrets or as an environment variable."
+        )
+        st.stop()
+
+    return value
+
+
 BACKEND_URL = get_config(
     "BACKEND_URL",
     "http://127.0.0.1:8000",
@@ -662,6 +677,35 @@ structured analytics in Supabase.
             ],
         )
 
+        findings = numeric_column(
+            data,
+            "issue_count",
+        ).dropna()
+
+        average_findings = (
+            findings.mean()
+            if not findings.empty
+            else None
+        )
+
+        highest_score = (
+            valid_scores.max()
+            if not valid_scores.empty
+            else None
+        )
+
+        lowest_score = (
+            valid_scores.min()
+            if not valid_scores.empty
+            else None
+        )
+
+        success_rate = (
+            100 * (total_reviews - high_risk_reviews) / total_reviews
+            if total_reviews
+            else None
+        )
+
 
         # ====================================================
         # TOP KPI CARDS
@@ -693,6 +737,48 @@ structured analytics in Supabase.
         kpi_4.metric(
             "Repositories",
             active_repositories,
+        )
+
+
+        kpi_5, kpi_6, kpi_7, kpi_8 = (
+            st.columns(4)
+        )
+
+        kpi_5.metric(
+            "Avg Findings / PR",
+            (
+                f"{average_findings:.1f}"
+                if average_findings is not None
+                else "N/A"
+            ),
+        )
+
+        kpi_6.metric(
+            "Highest Score",
+            (
+                f"{highest_score:.0f}/100"
+                if highest_score is not None
+                else "N/A"
+            ),
+        )
+
+        kpi_7.metric(
+            "Lowest Score",
+            (
+                f"{lowest_score:.0f}/100"
+                if lowest_score is not None
+                else "N/A"
+            ),
+        )
+
+        kpi_8.metric(
+            "Success Rate",
+            (
+                f"{success_rate:.0f}%"
+                if success_rate is not None
+                else "N/A"
+            ),
+            help="Share of reviewed PRs that were not High or Critical risk.",
         )
 
 
@@ -981,6 +1067,11 @@ structured analytics in Supabase.
             "### 🕒 Recent Reviews"
         )
 
+        repo_search = st.text_input(
+            "Search repository",
+            placeholder="e.g. my-org/my-repo",
+        )
+
         wanted_columns = [
             "created_at",
             "repo_name",
@@ -1009,6 +1100,21 @@ structured analytics in Supabase.
                     visible_columns
                 ].copy()
             )
+
+            if (
+                repo_search
+                and "repo_name" in recent_reviews.columns
+            ):
+
+                recent_reviews = recent_reviews[
+                    recent_reviews["repo_name"]
+                    .astype(str)
+                    .str.contains(
+                        repo_search,
+                        case=False,
+                        na=False,
+                    )
+                ]
 
             if (
                 "created_at"
@@ -1081,6 +1187,13 @@ structured analytics in Supabase.
                 hide_index=True,
             )
 
+            st.download_button(
+                "Download CSV",
+                recent_reviews.to_csv(index=False),
+                file_name="aegis_reviews.csv",
+                mime="text/csv",
+            )
+
         else:
 
             st.dataframe(
@@ -1088,3 +1201,15 @@ structured analytics in Supabase.
                 use_container_width=True,
                 hide_index=True,
             )
+
+
+# ============================================================
+# FOOTER
+# ============================================================
+
+st.divider()
+
+st.caption(
+    "Aegis AI — Powered by FastAPI, LangGraph, Gemini, "
+    "Supabase, and Streamlit."
+)
